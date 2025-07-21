@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encore - Recipe Cost Manager</title>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #FF6B35;
+            --secondary: #F7931E;
+            --success: #27AE60;
+            --warning: #F39C12;
+            --danger: #E74C3C;
+            --dark: #1a1a1a;
+            --background: #0f0f0f;
+            --surface: #1a1a1a;
+            --surface-light: #2a2a2a;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B4B4B4;
+            --text-tertiary: #808080;
+            --border: #333333;
+            --hover: #2a2a2a;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            --radius: 12px;
+            --radius-lg: 20px;
+            --glow: 0 0 20px rgba(255, 107, 53, 0.3);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+            font-size: 15px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Loader */
+        .loader-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--background);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--surface-light);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Header */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(26, 26, 26, 0.9);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo h1 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .sync-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            transition: all 0.3s ease;
+        }
+
+        .sync-indicator.syncing {
+            background: var(--warning);
+            animation: pulse 1s infinite;
+        }
+
+        .sync-indicator.error {
+            background: var(--danger);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            box-shadow: var(--shadow);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success {
+            border-color: var(--success);
+            background: rgba(39, 174, 96, 0.1);
+        }
+
+        .toast.error {
+            border-color: var(--danger);
+            background: rgba(231, 76, 60, 0.1);
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Login */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 48px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .login-title {
+            font-size: 32px;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .login-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        .google-btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            background: white;
+            color: #333;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .google-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .google-logo {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Sections */
+        .section {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease;
+            border: 1px solid var(--border);
+        }
+
+        .section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        th {
+            text-align: left;
+            padding: 16px;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        /* Inputs */
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            background: var(--surface-light);
+            color: var(--text-primary);
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--glow);
+        }
+
+        .btn-secondary {
+            background: var(--surface-light);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .btn-share {
+            background: var(--surface-light);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        /* Share Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: var(--shadow);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .share-link-container {
+            background: var(--surface-light);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .share-link {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: 'Monaco', monospace;
+        }
+
+        .copy-btn {
+            background: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <!-- Firebase Config -->
+    <script>
+        // ✅ TES CLÉS FIREBASE SONT DÉJÀ LÀ !
+        const firebaseConfig = {
+            apiKey: "AIzaSyCXYg7FuG3JwMMNZw9vkF1pS-5YFBiueAM",
+            authDomain: "encore-be4b6.firebaseapp.com",
+            projectId: "encore-be4b6",
+            storageBucket: "encore-be4b6.firebasestorage.app",
+            messagingSenderId: "80233682045",
+            appId: "1:80233682045:web:8bb16c600938a479474d14",
+            measurementId: "G-3C25E68TBR"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+
+    <!-- Loader -->
+    <div class="loader-container" id="loader">
+        <div class="loader"></div>
+        <div class="loader-text">Chargement...</div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Login -->
+    <div class="login-container" id="loginContainer" style="display: none;">
+        <div class="login-box">
+            <h1 class="login-title">🔥 Encore</h1>
+            <p class="login-subtitle">Recipe Cost Manager</p>
+            <button class="google-btn" onclick="signInWithGoogle()">
+                <svg class="google-logo" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Se connecter avec Google
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" style="display: none;">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🔥 Encore</h1>
+                    <div class="sync-status">
+                        <div class="sync-indicator" id="syncIndicator"></div>
+                        <span id="syncText">Synchronisé</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 16px; align-items: center;">
+                    <button class="btn btn-share" onclick="shareRecipes()">
+                        🔗 Partager
+                    </button>
+                    <button class="btn btn-secondary" onclick="signOut()">
+                        Déconnexion
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="container">
+            <p style="font-size: 18px; color: var(--text-secondary); margin-bottom: 40px;">
+                Calculez vos coûts et optimisez vos prix en temps réel ☁️
+            </p>
+
+            <!-- On va charger le contenu de l'app ici -->
+            <div id="appContent">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📊</div>
+                    <p>Chargement de vos recettes...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div class="modal-overlay" id="shareModal">
+        <div class="modal">
+            <h3 style="font-size: 24px; margin-bottom: 16px;">🔗 Partager les recettes</h3>
+            <div class="share-link-container">
+                <input type="text" class="share-link" id="shareLink" readonly>
+                <button class="copy-btn" onclick="copyShareLink()">Copier</button>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 14px;">
+                Ce lien permet de consulter vos recettes en lecture seule.
+            </p>
+            <button class="btn btn-secondary" onclick="closeShareModal()" style="margin-top: 16px;">
+                Fermer
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let autoSaveTimer = null;
+        let recipeData = {
+            ingredients: [],
+            intermediateRecipes: [],
+            finalRecipes: []
+        };
+
+        // Auth functions
+        async function signInWithGoogle() {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await auth.signInWithPopup(provider);
+                currentUser = result.user;
+                showToast(`Bienvenue ${currentUser.displayName} !`);
+            } catch (error) {
+                console.error('Login error:', error);
+                showToast('Erreur de connexion', 'error');
+            }
+        }
+
+        async function signOut() {
+            try {
+                await saveToFirebase(); // Save before logout
+                await auth.signOut();
+                showToast('Déconnexion réussie');
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        // Auth state observer
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+                document.getElementById('loader').style.display = 'none';
+                
+                await loadFromFirebase();
+                loadAppContent();
+                startAutoSave();
+            } else {
+                currentUser = null;
+                document.getElementById('loginContainer').style.display = 'flex';
+                document.getElementById('app').style.display = 'none';
+                document.getElementById('loader').style.display = 'none';
+            }
+        });
+
+        // Toast notifications
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <span>${type === 'success' ? '✅' : '❌'}</span>
+                <span>${message}</span>
+            `;
+            
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Sync status
+        function updateSyncStatus(status) {
+            const indicator = document.getElementById('syncIndicator');
+            const text = document.getElementById('syncText');
+            
+            switch(status) {
+                case 'syncing':
+                    indicator.className = 'sync-indicator syncing';
+                    text.textContent = 'Synchronisation...';
+                    break;
+                case 'error':
+                    indicator.className = 'sync-indicator error';
+                    text.textContent = 'Erreur de sync';
+                    break;
+                default:
+                    indicator.className = 'sync-indicator';
+                    text.textContent = 'Synchronisé';
+            }
+        }
+
+        // Firebase operations
+        async function saveToFirebase() {
+            if (!currentUser) return;
+            
+            updateSyncStatus('syncing');
+            
+            try {
+                const docRef = db.collection('recipes').doc(currentUser.uid);
+                await docRef.set({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    restaurantName: 'Encore',
+                    data: collectAllData(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                updateSyncStatus('synced');
+            } catch (error) {
+                console.error('Save error:', error);
+                updateSyncStatus('error');
+                showToast('Erreur de sauvegarde', 'error');
+            }
+        }
+
+        async function loadFromFirebase() {
+            if (!currentUser) return;
+            
+            try {
+                const docRef = db.collection('recipes').doc(currentUser.uid);
+                const doc = await docRef.get();
+                
+                if (doc.exists) {
+                    const data = doc.data();
+                    recipeData = data.data || recipeData;
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                showToast('Erreur de chargement', 'error');
+            }
+        }
+
+        // Auto-save
+        function startAutoSave() {
+            // Save every 30 seconds
+            autoSaveTimer = setInterval(() => {
+                saveToFirebase();
+            }, 30000);
+        }
+
+        // Share functionality
+        async function shareRecipes() {
+            try {
+                const shareId = Math.random().toString(36).substr(2, 9);
+                const shareRef = db.collection('shared').doc(shareId);
+                
+                await shareRef.set({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    restaurantName: 'Encore',
+                    data: collectAllData(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                const shareLink = `${window.location.origin}${window.location.pathname}?share=${shareId}`;
+                document.getElementById('shareLink').value = shareLink;
+                document.getElementById('shareModal').classList.add('active');
+                
+            } catch (error) {
+                console.error('Share error:', error);
+                showToast('Erreur de partage', 'error');
+            }
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.remove('active');
+        }
+
+        function copyShareLink() {
+            const shareLink = document.getElementById('shareLink');
+            shareLink.select();
+            document.execCommand('copy');
+            showToast('Lien copié !');
+        }
+
+        // Data collection (simplified for demo)
+        function collectAllData() {
+            // This would collect all the form data
+            // For now, return the recipeData object
+            return recipeData;
+        }
+
+        // Load app content
+        function loadAppContent() {
+            document.getElementById('appContent').innerHTML = `
+                <div class="section">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <span style="font-size: 28px;">🥗</span>
+                            Ingrédients
+                        </h2>
+                        <button class="btn btn-primary" onclick="addIngredient()">
+                            + Ajouter
+                        </button>
+                    </div>
+                    <table id="ingredientsTable">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Prix</th>
+                                <th>Unité</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ingredientsList">
+                            <!-- Ingredients will be added here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="empty-state">
+                    <p>🚧 Le reste de l'app arrive bientôt...</p>
+                    <p style="font-size: 14px; margin-top: 8px;">
+                        Tu peux déjà ajouter des ingrédients, ça se sauvegarde automatiquement !
+                    </p>
+                </div>
+            `;
+            
+            // Load existing ingredients
+            if (recipeData.ingredients.length > 0) {
+                recipeData.ingredients.forEach(ing => {
+                    addIngredientRow(ing);
+                });
+            }
+        }
+
+        // Simple ingredient management
+        function addIngredient() {
+            addIngredientRow();
+        }
+
+        function addIngredientRow(data = {}) {
+            const tbody = document.getElementById('ingredientsList');
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td><input type="text" placeholder="Nom" value="${data.name || ''}" onchange="saveIngredients()"></td>
+                <td><input type="number" placeholder="0.00" value="${data.price || ''}" step="0.01" onchange="saveIngredients()"></td>
+                <td>
+                    <select onchange="saveIngredients()">
+                        <option value="kg" ${data.unit === 'kg' ? 'selected' : ''}>€/kg</option>
+                        <option value="piece" ${data.unit === 'piece' ? 'selected' : ''}>€/pièce</option>
+                        <option value="L" ${data.unit === 'L' ? 'selected' : ''}>€/L</option>
+                    </select>
+                </td>
+                <td><button class="btn btn-danger" onclick="deleteRow(this)">✕</button></td>
+            `;
+        }
+
+        function deleteRow(btn) {
+            btn.closest('tr').remove();
+            saveIngredients();
+        }
+
+        function saveIngredients() {
+            const ingredients = [];
+            document.querySelectorAll('#ingredientsList tr').forEach(row => {
+                const name = row.cells[0].querySelector('input').value;
+                const price = row.cells[1].querySelector('input').value;
+                const unit = row.cells[2].querySelector('select').value;
+                if (name) {
+                    ingredients.push({ name, price, unit });
+                }
+            });
+            recipeData.ingredients = ingredients;
+            saveToFirebase();
+        }
+
+        // Check for shared link on load
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const shareId = urlParams.get('share');
+            
+            if (shareId) {
+                // Load shared data (read-only mode)
+                console.log('Loading shared recipe:', shareId);
+            }
+        });
+    </script>
+</body>
+</html>
