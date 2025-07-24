@@ -658,9 +658,6 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 16px; align-items: center;">
-                    <button class="btn btn-secondary" onclick="showFirebaseData()">
-                        🔍 Voir mes données
-                    </button>
                     <button class="btn btn-secondary" onclick="if(confirm('Charger les données d\'exemple? Cela remplacera vos données actuelles.')) { addSampleData(); }">
                         📥 Données d'exemple
                     </button>
@@ -703,23 +700,6 @@
             <button class="btn btn-secondary" onclick="closeShareModal()" style="margin-top: 16px;">
                 Fermer
             </button>
-        </div>
-    </div>
-
-    <!-- Data Viewer Modal -->
-    <div class="modal-overlay" id="dataModal">
-        <div class="modal" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
-            <h3 style="font-size: 24px; margin-bottom: 16px;">🔍 Vos données Firebase</h3>
-            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-                <button class="btn btn-primary" onclick="downloadFirebaseData()">
-                    💾 Télécharger JSON
-                </button>
-                <button class="btn btn-secondary" onclick="exportAllToExcel()">
-                    📊 Exporter Excel
-                </button>
-            </div>
-            <pre id="dataContent" style="background: var(--surface-light); padding: 20px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.5; color: var(--text-primary);"></pre>
-            <button class="btn btn-secondary" onclick="closeDataModal()" style="margin-top: 16px;">Fermer</button>
         </div>
     </div>
 
@@ -1649,103 +1629,6 @@
                 console.log('Loading shared recipe:', shareId);
             }
         });
-
-        // Fonctions pour voir les données Firebase
-        function showFirebaseData() {
-            const data = {
-                user: {
-                    email: currentUser?.email || 'Non connecté',
-                    uid: currentUser?.uid || 'N/A'
-                },
-                timestamp: new Date().toISOString(),
-                data: recipeData,
-                stats: {
-                    ingredients: recipeData.ingredients.length,
-                    intermediateRecipes: recipeData.intermediateRecipes.length,
-                    finalRecipes: recipeData.finalRecipes.length
-                }
-            };
-            
-            document.getElementById('dataContent').textContent = JSON.stringify(data, null, 2);
-            document.getElementById('dataModal').classList.add('active');
-        }
-
-        function closeDataModal() {
-            document.getElementById('dataModal').classList.remove('active');
-        }
-
-        function downloadFirebaseData() {
-            const data = {
-                user: {
-                    email: currentUser?.email || 'Non connecté',
-                    uid: currentUser?.uid || 'N/A'
-                },
-                timestamp: new Date().toISOString(),
-                data: recipeData
-            };
-            
-            const jsonStr = JSON.stringify(data, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `encore-recipes-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            showToast('Données téléchargées !');
-        }
-
-        // Export Excel complet
-        function exportAllToExcel() {
-            const wb = XLSX.utils.book_new();
-            
-            // Feuille Ingrédients
-            const ingredientsData = recipeData.ingredients.map(ing => ({
-                'Nom': ing.name,
-                'Prix': ing.price,
-                'Unité': ing.unit
-            }));
-            const ws1 = XLSX.utils.json_to_sheet(ingredientsData);
-            XLSX.utils.book_append_sheet(wb, ws1, "Ingrédients");
-            
-            // Feuille Recettes Intermédiaires
-            const intermediateData = recipeData.intermediateRecipes.map(recipe => {
-                const cost = calculateRecipeCost(recipe);
-                return {
-                    'Nom': recipe.name,
-                    'Quantité produite': recipe.quantity,
-                    'Unité': recipe.unit,
-                    'Coût total': cost.toFixed(2),
-                    'Coût unitaire': (cost / recipe.quantity).toFixed(2),
-                    'Marge %': recipe.margin,
-                    'Prix de vente': ((cost / recipe.quantity) * (1 + recipe.margin/100)).toFixed(2)
-                };
-            });
-            const ws2 = XLSX.utils.json_to_sheet(intermediateData);
-            XLSX.utils.book_append_sheet(wb, ws2, "Recettes Intermédiaires");
-            
-            // Feuille Recettes Finales
-            const finalData = recipeData.finalRecipes.map(recipe => {
-                const cost = calculateFinalRecipeCost(recipe);
-                const margin = recipe.sellingPrice ? ((recipe.sellingPrice - cost) / recipe.sellingPrice * 100).toFixed(1) : 0;
-                return {
-                    'Nom': recipe.name,
-                    'Coût total': cost.toFixed(2),
-                    'Prix de vente': recipe.sellingPrice,
-                    'Marge %': margin,
-                    'Bénéfice': (recipe.sellingPrice - cost).toFixed(2)
-                };
-            });
-            const ws3 = XLSX.utils.json_to_sheet(finalData);
-            XLSX.utils.book_append_sheet(wb, ws3, "Recettes Finales");
-            
-            // Télécharger
-            XLSX.writeFile(wb, `encore-recipes-${new Date().toISOString().split('T')[0]}.xlsx`);
-            showToast('Export Excel réussi !');
-        }
     </script>
 </body>
 </html>

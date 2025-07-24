@@ -844,7 +844,7 @@
             updateSyncStatus('syncing');
             
             try {
-                const docRef = db.collection('recipes').doc(currentUser.uid);
+                const docRef = db.collection('users').doc(currentUser.uid);
                 await docRef.set({
                     userId: currentUser.uid,
                     userEmail: currentUser.email,
@@ -865,7 +865,7 @@
             if (!currentUser) return;
             
             try {
-                const docRef = db.collection('recipes').doc(currentUser.uid);
+                const docRef = db.collection('users').doc(currentUser.uid);
                 const doc = await docRef.get();
                 
                 if (doc.exists) {

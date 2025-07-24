@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encore - Gestionnaire de Recettes</title>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0066FF;
+            --primary-hover: #0052CC;
+            --success: #00AA00;
+            --danger: #DC2626;
+            --warning: #F59E0B;
+            --background: #FFFFFF;
+            --surface: #F8F9FA;
+            --surface-hover: #F1F3F5;
+            --text-primary: #1A1A1A;
+            --text-secondary: #6B7280;
+            --text-tertiary: #9CA3AF;
+            --border: #E5E7EB;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        /* Header */
+        .header {
+            background: var(--background);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--surface);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .nav-tab {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .nav-tab:hover {
+            color: var(--text-primary);
+            background: var(--surface-hover);
+        }
+
+        .nav-tab.active {
+            background: var(--background);
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            background: var(--surface);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+        }
+
+        .btn-icon {
+            padding: 8px;
+            width: 36px;
+            height: 36px;
+            justify-content: center;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        /* Main Content */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .grid-cols-2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .grid-cols-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .grid-cols-4 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        @media (max-width: 768px) {
+            .grid-cols-2,
+            .grid-cols-3,
+            .grid-cols-4 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Stats Card */
+        .stat-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: var(--surface);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: var(--surface);
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.15s ease;
+            background: var(--background);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--background);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: modalIn 0.2s ease;
+        }
+
+        @keyframes modalIn {
+            from {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* Ingredient List */
+        .ingredient-item {
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .ingredient-item:hover {
+            transform: translateX(4px);
+            background: var(--surface-hover);
+        }
+
+        .ingredient-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .ingredient-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .ingredient-price {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .ingredient-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        /* Recipe Card */
+        .recipe-item {
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.15s ease;
+        }
+
+        .recipe-item:hover {
+            box-shadow: var(--shadow);
+            transform: translateY(-2px);
+        }
+
+        .recipe-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+
+        .recipe-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .recipe-cost {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .recipe-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .detail-item {
+            text-align: center;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .empty-text {
+            margin-bottom: 20px;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1001;
+        }
+
+        .toast {
+            background: var(--text-primary);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow-lg);
+            animation: toastIn 0.3s ease;
+        }
+
+        @keyframes toastIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success {
+            background: var(--success);
+        }
+
+        .toast.error {
+            background: var(--danger);
+        }
+
+        /* Loading */
+        .loader-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loader {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Login Page */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: var(--surface);
+        }
+
+        .login-box {
+            background: var(--background);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+        }
+
+        .login-logo {
+            width: 80px;
+            height: 80px;
+            background: var(--primary);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 40px;
+            margin: 0 auto 24px;
+        }
+
+        .login-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        .google-btn {
+            width: 100%;
+            padding: 12px 24px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .google-btn:hover {
+            background: var(--surface);
+            box-shadow: var(--shadow);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-wrap: wrap;
+            }
+
+            .nav-tabs {
+                order: 3;
+                width: 100%;
+            }
+
+            .container {
+                padding: 16px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Firebase Config -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCXYg7FuQ3JwMMWZw9vkF1pS-5YFBiueAM",
+            authDomain: "encore-be4b6.firebaseapp.com",
+            projectId: "encore-be4b6",
+            storageBucket: "encore-be4b6.firebasestorage.app",
+            messagingSenderId: "80233682045",
+            appId: "1:80233682045:web:8bb16c600938a479474d14",
+            measurementId: "G-3C25E68TBR"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+
+    <!-- Loader -->
+    <div class="loader-container" id="loader">
+        <div class="loader"></div>
+    </div>
+
+    <!-- Login Page -->
+    <div class="login-container" id="loginContainer" style="display: none;">
+        <div class="login-box">
+            <div class="login-logo">🍽️</div>
+            <h1 class="login-title">Encore</h1>
+            <p class="login-subtitle">Gestionnaire de coûts de recettes</p>
+            <button class="google-btn" onclick="signInWithGoogle()">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Se connecter avec Google
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" style="display: none;">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">🍽️</div>
+                    <span>Encore</span>
+                </div>
+
+                <nav class="nav-tabs">
+                    <button class="nav-tab active" onclick="switchTab('dashboard')">
+                        📊 Tableau de bord
+                    </button>
+                    <button class="nav-tab" onclick="switchTab('ingredients')">
+                        🥗 Ingrédients
+                    </button>
+                    <button class="nav-tab" onclick="switchTab('intermediate')">
+                        🥘 Recettes intermédiaires
+                    </button>
+                    <button class="nav-tab" onclick="switchTab('final')">
+                        🍽️ Recettes finales
+                    </button>
+                </nav>
+
+                <div class="header-actions">
+                    <button class="btn btn-icon" onclick="showDataModal()" title="Voir les données">
+                        📁
+                    </button>
+                    <button class="btn btn-icon" onclick="shareRecipes()" title="Partager">
+                        🔗
+                    </button>
+                    <button class="btn" onclick="signOut()">
+                        Déconnexion
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="container">
+            <!-- Dashboard Tab -->
+            <div id="dashboard-tab" class="tab-content active">
+                <div class="grid grid-cols-4" style="margin-bottom: 32px;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-ingredients">0</div>
+                        <div class="stat-label">Ingrédients</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-intermediate">0</div>
+                        <div class="stat-label">Recettes intermédiaires</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-final">0</div>
+                        <div class="stat-label">Recettes finales</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-revenue">0€</div>
+                        <div class="stat-label">Revenu potentiel</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2" style="gap: 24px;">
+                    <div class="card">
+                        <h3 class="card-title">Recettes les plus rentables</h3>
+                        <div id="top-recipes"></div>
+                    </div>
+                    <div class="card">
+                        <h3 class="card-title">Ingrédients les plus utilisés</h3>
+                        <div id="top-ingredients"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ingredients Tab -->
+            <div id="ingredients-tab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Ingrédients de base</h2>
+                        <button class="btn btn-primary" onclick="showIngredientModal()">
+                            + Ajouter un ingrédient
+                        </button>
+                    </div>
+                    <div id="ingredients-list"></div>
+                </div>
+            </div>
+
+            <!-- Intermediate Recipes Tab -->
+            <div id="intermediate-tab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Recettes intermédiaires</h2>
+                        <button class="btn btn-primary" onclick="showIntermediateModal()">
+                            + Nouvelle recette
+                        </button>
+                    </div>
+                    <div id="intermediate-list"></div>
+                </div>
+            </div>
+
+            <!-- Final Recipes Tab -->
+            <div id="final-tab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Recettes finales</h2>
+                        <button class="btn btn-primary" onclick="showFinalModal()">
+                            + Nouveau plat
+                        </button>
+                    </div>
+                    <div id="final-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Modals -->
+    <!-- Ingredient Modal -->
+    <div class="modal-overlay" id="ingredientModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Nouvel ingrédient</h3>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Nom</label>
+                    <input type="text" class="form-control" id="ingredient-name" placeholder="Ex: Tomate">
+                </div>
+                <div class="grid grid-cols-2">
+                    <div class="form-group">
+                        <label class="form-label">Prix</label>
+                        <input type="number" class="form-control" id="ingredient-price" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Unité</label>
+                        <select class="form-control" id="ingredient-unit">
+                            <option value="kg">€/kg</option>
+                            <option value="piece">€/pièce</option>
+                            <option value="L">€/L</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('ingredientModal')">Annuler</button>
+                <button class="btn btn-primary" onclick="saveIngredient()">Ajouter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Modal -->
+    <div class="modal-overlay" id="dataModal">
+        <div class="modal" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Vos données</h3>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                    <button class="btn btn-primary" onclick="downloadJSON()">
+                        💾 Télécharger JSON
+                    </button>
+                    <button class="btn" onclick="exportExcel()">
+                        📊 Exporter Excel
+                    </button>
+                    <button class="btn" onclick="loadSampleData()">
+                        📥 Charger données d'exemple
+                    </button>
+                </div>
+                <pre id="dataContent" style="background: var(--surface); padding: 16px; border-radius: 8px; overflow: auto; max-height: 400px; font-size: 12px;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('dataModal')">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State
+        let currentUser = null;
+        let recipeData = {
+            ingredients: [],
+            intermediateRecipes: [],
+            finalRecipes: []
+        };
+
+        // Auth
+        async function signInWithGoogle() {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await auth.signInWithPopup(provider);
+            } catch (error) {
+                showToast('Erreur de connexion', 'error');
+            }
+        }
+
+        async function signOut() {
+            try {
+                await auth.signOut();
+            } catch (error) {
+                showToast('Erreur de déconnexion', 'error');
+            }
+        }
+
+        // Auth state observer
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+                document.getElementById('loader').style.display = 'none';
+                
+                await loadFromFirebase();
+                updateUI();
+                startAutoSave();
+            } else {
+                currentUser = null;
+                document.getElementById('loginContainer').style.display = 'flex';
+                document.getElementById('app').style.display = 'none';
+                document.getElementById('loader').style.display = 'none';
+            }
+        });
+
+        // Firebase operations
+        async function saveToFirebase() {
+            if (!currentUser) return;
+            
+            try {
+                const docRef = db.collection('users').doc(currentUser.uid);
+                await docRef.set({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    data: recipeData,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (error) {
+                console.error('Save error:', error);
+            }
+        }
+
+        async function loadFromFirebase() {
+            if (!currentUser) return;
+            
+            try {
+                const docRef = db.collection('users').doc(currentUser.uid);
+                const doc = await docRef.get();
+                
+                if (doc.exists) {
+                    const data = doc.data();
+                    recipeData = data.data || recipeData;
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+            }
+        }
+
+        // Auto-save
+        function startAutoSave() {
+            setInterval(() => {
+                saveToFirebase();
+            }, 30000);
+        }
+
+        // UI Functions
+        function switchTab(tab) {
+            // Update nav
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`${tab}-tab`).classList.add('active');
+        }
+
+        function updateUI() {
+            updateDashboard();
+            updateIngredientsList();
+            updateIntermediateList();
+            updateFinalList();
+        }
+
+        function updateDashboard() {
+            // Update stats
+            document.getElementById('stat-ingredients').textContent = recipeData.ingredients.length;
+            document.getElementById('stat-intermediate').textContent = recipeData.intermediateRecipes.length;
+            document.getElementById('stat-final').textContent = recipeData.finalRecipes.length;
+            
+            // Calculate total revenue
+            const revenue = recipeData.finalRecipes.reduce((sum, r) => sum + (r.sellingPrice || 0), 0);
+            document.getElementById('stat-revenue').textContent = revenue.toFixed(0) + '€';
+            
+            // Top recipes by margin
+            const topRecipes = [...recipeData.finalRecipes]
+                .map(recipe => {
+                    const cost = calculateFinalRecipeCost(recipe);
+                    const margin = recipe.sellingPrice ? ((recipe.sellingPrice - cost) / recipe.sellingPrice * 100) : 0;
+                    return { ...recipe, margin, profit: recipe.sellingPrice - cost };
+                })
+                .sort((a, b) => b.margin - a.margin)
+                .slice(0, 5);
+                
+            const topRecipesHtml = topRecipes.length ? topRecipes.map(r => `
+                <div class="ingredient-item">
+                    <div class="ingredient-info">
+                        <div class="ingredient-name">${r.name || 'Sans nom'}</div>
+                        <div class="ingredient-price">Marge: ${r.margin.toFixed(1)}%</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 600; color: var(--primary);">${r.sellingPrice}€</div>
+                        <div style="font-size: 12px; color: var(--success);">+${r.profit.toFixed(2)}€</div>
+                    </div>
+                </div>
+            `).join('') : '<div class="empty-state"><p>Aucune recette finale</p></div>';
+            
+            document.getElementById('top-recipes').innerHTML = topRecipesHtml;
+            
+            // Top ingredients by usage
+            const ingredientUsage = {};
+            recipeData.intermediateRecipes.forEach(recipe => {
+                recipe.ingredients?.forEach(ing => {
+                    ingredientUsage[ing.ingredientId] = (ingredientUsage[ing.ingredientId] || 0) + 1;
+                });
+            });
+            
+            const topIngredients = Object.entries(ingredientUsage)
+                .map(([id, count]) => {
+                    const ingredient = recipeData.ingredients.find(i => i.id === id);
+                    return { ...ingredient, count };
+                })
+                .filter(i => i.name)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 5);
+                
+            const topIngredientsHtml = topIngredients.length ? topIngredients.map(i => `
+                <div class="ingredient-item">
+                    <div class="ingredient-info">
+                        <div class="ingredient-name">${i.name}</div>
+                        <div class="ingredient-price">${i.price}€/${i.unit}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 600;">${i.count} recettes</div>
+                    </div>
+                </div>
+            `).join('') : '<div class="empty-state"><p>Aucun ingrédient utilisé</p></div>';
+            
+            document.getElementById('top-ingredients').innerHTML = topIngredientsHtml;
+        }
+
+        function updateIngredientsList() {
+            const container = document.getElementById('ingredients-list');
+            
+            if (recipeData.ingredients.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🥗</div>
+                        <div class="empty-title">Aucun ingrédient</div>
+                        <div class="empty-text">Commencez par ajouter vos ingrédients de base</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = recipeData.ingredients.map(ing => `
+                <div class="ingredient-item">
+                    <div class="ingredient-info">
+                        <div class="ingredient-name">${ing.name || 'Sans nom'}</div>
+                        <div class="ingredient-price">${ing.price}€/${ing.unit}</div>
+                    </div>
+                    <div class="ingredient-actions">
+                        <button class="btn btn-sm" onclick="editIngredient('${ing.id}')">✏️</button>
+                        <button class="btn btn-sm" onclick="deleteIngredient('${ing.id}')">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateIntermediateList() {
+            const container = document.getElementById('intermediate-list');
+            
+            if (recipeData.intermediateRecipes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🥘</div>
+                        <div class="empty-title">Aucune recette intermédiaire</div>
+                        <div class="empty-text">Créez des sauces, pâtes et préparations de base</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `<div class="grid grid-cols-2">` + 
+                recipeData.intermediateRecipes.map(recipe => {
+                    const cost = calculateRecipeCost(recipe);
+                    const unitCost = recipe.quantity ? (cost / recipe.quantity) : 0;
+                    
+                    return `
+                        <div class="recipe-item">
+                            <div class="recipe-header">
+                                <h3 class="recipe-name">${recipe.name || 'Sans nom'}</h3>
+                                <div class="recipe-cost">${cost.toFixed(2)}€</div>
+                            </div>
+                            <div class="recipe-details">
+                                <div class="detail-item">
+                                    <div class="detail-label">Quantité</div>
+                                    <div class="detail-value">${recipe.quantity} ${recipe.unit}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Coût/unité</div>
+                                    <div class="detail-value">${unitCost.toFixed(2)}€</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Marge</div>
+                                    <div class="detail-value">${recipe.margin}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('') + `</div>`;
+        }
+
+        function updateFinalList() {
+            const container = document.getElementById('final-list');
+            
+            if (recipeData.finalRecipes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🍽️</div>
+                        <div class="empty-title">Aucune recette finale</div>
+                        <div class="empty-text">Assemblez vos plats à partir des ingrédients et recettes</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `<div class="grid grid-cols-2">` + 
+                recipeData.finalRecipes.map(recipe => {
+                    const cost = calculateFinalRecipeCost(recipe);
+                    const margin = recipe.sellingPrice ? ((recipe.sellingPrice - cost) / recipe.sellingPrice * 100) : 0;
+                    const profit = recipe.sellingPrice - cost;
+                    
+                    return `
+                        <div class="recipe-item">
+                            <div class="recipe-header">
+                                <h3 class="recipe-name">${recipe.name || 'Sans nom'}</h3>
+                                <div class="recipe-cost">${recipe.sellingPrice || 0}€</div>
+                            </div>
+                            <div class="recipe-details">
+                                <div class="detail-item">
+                                    <div class="detail-label">Coût</div>
+                                    <div class="detail-value">${cost.toFixed(2)}€</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Marge</div>
+                                    <div class="detail-value" style="color: ${margin < 30 ? 'var(--danger)' : margin > 60 ? 'var(--success)' : 'inherit'}">
+                                        ${margin.toFixed(1)}%
+                                    </div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Profit</div>
+                                    <div class="detail-value" style="color: ${profit > 0 ? 'var(--success)' : 'var(--danger)'}">
+                                        ${profit > 0 ? '+' : ''}${profit.toFixed(2)}€
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('') + `</div>`;
+        }
+
+        // Calculate costs
+        function calculateRecipeCost(recipe) {
+            let total = 0;
+            recipe.ingredients?.forEach(ing => {
+                const ingredient = recipeData.ingredients.find(i => i.id === ing.ingredientId);
+                if (ingredient) {
+                    total += ingredient.price * ing.quantity;
+                }
+            });
+            return total;
+        }
+
+        function calculateFinalRecipeCost(recipe) {
+            let total = 0;
+            recipe.components?.forEach(comp => {
+                if (comp.type === 'ingredient') {
+                    const ingredient = recipeData.ingredients.find(i => i.id === comp.id);
+                    if (ingredient) {
+                        total += ingredient.price * comp.quantity;
+                    }
+                } else {
+                    const intermediateRecipe = recipeData.intermediateRecipes.find(r => r.id === comp.id);
+                    if (intermediateRecipe) {
+                        const recipeCost = calculateRecipeCost(intermediateRecipe);
+                        const unitCost = recipeCost / intermediateRecipe.quantity;
+                        total += unitCost * comp.quantity * (1 + intermediateRecipe.margin/100);
+                    }
+                }
+            });
+            return total;
+        }
+
+        // Modal functions
+        function showIngredientModal() {
+            document.getElementById('ingredientModal').classList.add('active');
+            document.getElementById('ingredient-name').focus();
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function saveIngredient() {
+            const name = document.getElementById('ingredient-name').value;
+            const price = parseFloat(document.getElementById('ingredient-price').value) || 0;
+            const unit = document.getElementById('ingredient-unit').value;
+            
+            if (!name) {
+                showToast('Veuillez entrer un nom', 'error');
+                return;
+            }
+            
+            recipeData.ingredients.push({
+                id: Date.now().toString(),
+                name,
+                price,
+                unit
+            });
+            
+            updateUI();
+            saveToFirebase();
+            closeModal('ingredientModal');
+            showToast('Ingrédient ajouté !');
+            
+            // Reset form
+            document.getElementById('ingredient-name').value = '';
+            document.getElementById('ingredient-price').value = '';
+        }
+
+        function deleteIngredient(id) {
+            if (confirm('Supprimer cet ingrédient ?')) {
+                recipeData.ingredients = recipeData.ingredients.filter(i => i.id !== id);
+                updateUI();
+                saveToFirebase();
+                showToast('Ingrédient supprimé');
+            }
+        }
+
+        // Data viewer
+        function showDataModal() {
+            const data = {
+                user: {
+                    email: currentUser?.email,
+                    uid: currentUser?.uid
+                },
+                data: recipeData,
+                stats: {
+                    ingredients: recipeData.ingredients.length,
+                    intermediateRecipes: recipeData.intermediateRecipes.length,
+                    finalRecipes: recipeData.finalRecipes.length
+                }
+            };
+            
+            document.getElementById('dataContent').textContent = JSON.stringify(data, null, 2);
+            document.getElementById('dataModal').classList.add('active');
+        }
+
+        function downloadJSON() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                data: recipeData
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `encore-recipes-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showToast('Données téléchargées !');
+        }
+
+        function exportExcel() {
+            const wb = XLSX.utils.book_new();
+            
+            // Ingredients sheet
+            const ingredientsData = recipeData.ingredients.map(ing => ({
+                'Nom': ing.name,
+                'Prix': ing.price,
+                'Unité': ing.unit
+            }));
+            const ws1 = XLSX.utils.json_to_sheet(ingredientsData);
+            XLSX.utils.book_append_sheet(wb, ws1, "Ingrédients");
+            
+            // Download
+            XLSX.writeFile(wb, `encore-recipes-${new Date().toISOString().split('T')[0]}.xlsx`);
+            showToast('Export Excel réussi !');
+        }
+
+        function loadSampleData() {
+            if (!confirm('Charger les données d\'exemple ? Cela remplacera vos données actuelles.')) return;
+            
+            recipeData = {
+                ingredients: [
+                    { id: '1', name: 'Tomate', price: 2.5, unit: 'kg' },
+                    { id: '2', name: 'Mozzarella', price: 8, unit: 'kg' },
+                    { id: '3', name: 'Farine', price: 1.2, unit: 'kg' },
+                    { id: '4', name: 'Huile d\'olive', price: 12, unit: 'L' },
+                    { id: '5', name: 'Basilic', price: 25, unit: 'kg' }
+                ],
+                intermediateRecipes: [
+                    {
+                        id: '101',
+                        name: 'Sauce tomate',
+                        ingredients: [
+                            { ingredientId: '1', quantity: 1 },
+                            { ingredientId: '4', quantity: 0.05 }
+                        ],
+                        quantity: 1,
+                        unit: 'kg',
+                        margin: 30
+                    }
+                ],
+                finalRecipes: [
+                    {
+                        id: '201',
+                        name: 'Pizza Margherita',
+                        components: [
+                            { type: 'intermediate', id: '101', quantity: 0.15 },
+                            { type: 'ingredient', id: '2', quantity: 0.12 }
+                        ],
+                        sellingPrice: 12
+                    }
+                ]
+            };
+            
+            updateUI();
+            saveToFirebase();
+            closeModal('dataModal');
+            showToast('Données d\'exemple chargées !');
+        }
+
+        // Toast
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'toastIn 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Share
+        async function shareRecipes() {
+            try {
+                const shareId = Math.random().toString(36).substr(2, 9);
+                const shareRef = db.collection('shared').doc(shareId);
+                
+                await shareRef.set({
+                    userId: currentUser.uid,
+                    data: recipeData,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                const shareLink = `${window.location.origin}${window.location.pathname}?share=${shareId}`;
+                
+                if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(shareLink);
+                    showToast('Lien copié dans le presse-papier !');
+                } else {
+                    prompt('Lien de partage:', shareLink);
+                }
+            } catch (error) {
+                showToast('Erreur de partage', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
